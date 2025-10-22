@@ -50,9 +50,16 @@ USERNAME = CONFIG['username']
 PASSWORD = CONFIG['password']
 SERVICES = CONFIG['services']
 
-def check_auth(username, password):
-    return username == USERNAME and password == PASSWORD
+login_attempts = {}
 
+def check_auth(username, password):
+    ip = request.remote_addr
+    if login_attempts.get(ip, 0) > 5:
+        time.sleep(3)
+    ok = username == USERNAME and password == PASSWORD
+    login_attempts[ip] = 0 if ok else login_attempts.get(ip, 0) + 1
+    return ok
+        
 def authenticate():
     return Response(
         'Authentication required', 401,
@@ -211,7 +218,10 @@ def api_data():
 def api_logs(service_name):
     lines = request.args.get('lines', 100, type=int)
     logs = get_service_logs(service_name, lines)
-    return jsonify({'service': service_name, 'logs': logs})
+    if service_name in SERVICES:
+        return jsonify({'service': service_name, 'logs': logs})
+    else:
+        return jsonify({'service': 'not allowed', 'logs': 'not allowed'})
 
 if __name__ == '__main__':
     print("Starting System Monitor Dashboard...")
@@ -221,4 +231,4 @@ if __name__ == '__main__':
     print(f"  Password: {PASSWORD}")
     print(f"\nMonitoring services:", ', '.join(SERVICES))
     print("\nPress Ctrl+C to stop")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='127.0.0.1', port=5000, debug=False)
